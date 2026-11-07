@@ -23,3 +23,4 @@ jobs:
 
     - name: Build Release App
       run: ./Scripts/build_app.sh
+

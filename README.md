@@ -45,6 +45,12 @@ To install it into your macOS Applications folder:
 cp -R "dist/XAMPP Helper.app" /Applications/
 ```
 
+> [!TIP]
+> **First-time launch on another Mac**: If macOS shows *"cannot be opened because Apple cannot check it for malicious software"*, **Right-click** (or Control-click) `XAMPP Helper.app` → click **Open** → click **Open** (only needed once), or run:
+> ```bash
+> xattr -cr "/Applications/XAMPP Helper.app"
+> ```
+
 ### 2. Run Directly from Source (Developer Mode)
 You can launch the app directly using the Swift Package Manager:
 
