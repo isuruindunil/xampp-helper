@@ -99,11 +99,35 @@ public struct ServiceCardView: View {
                         } label: {
                             Label("Open http://localhost", systemImage: "safari")
                         }
+
+                        Button {
+                            manager.openPhpInfo()
+                        } label: {
+                            Label("Open phpinfo()", systemImage: "info.circle")
+                        }
+
+                        Button {
+                            Task { await manager.testApacheConfig() }
+                        } label: {
+                            Label("Test Apache Syntax (httpd -t)", systemImage: "checkmark.seal")
+                        }
+
+                        Button {
+                            manager.openConfigFile(path: PathConfig.vhostsConfPath, name: "Virtual Hosts")
+                        } label: {
+                            Label("Edit Virtual Hosts (httpd-vhosts.conf)", systemImage: "network")
+                        }
                     } else if service == .mysql {
                         Button {
                             manager.openPhpMyAdmin()
                         } label: {
                             Label("Open phpMyAdmin", systemImage: "cylinder.split.1x2")
+                        }
+
+                        Button {
+                            manager.openMysqlTerminal()
+                        } label: {
+                            Label("Open MySQL in Terminal", systemImage: "terminal")
                         }
                     }
 

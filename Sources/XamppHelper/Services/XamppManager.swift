@@ -313,6 +313,41 @@ public final class XamppManager: ObservableObject {
         openPathInFinder(PathConfig.etcPath, name: "Config (etc)")
     }
 
+    public func openMysqlTerminal() {
+        let script = """
+        tell application "Terminal"
+            activate
+            do script "\(PathConfig.xamppfilesPath)/bin/mysql -u root"
+        end tell
+        """
+        var errorDict: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            _ = appleScript.executeAndReturnError(&errorDict)
+            appendLog(level: .info, source: "MySQL", message: "Launched MySQL CLI in Terminal.")
+        }
+    }
+
+    public func testApacheConfig() async {
+        isOperating = true
+        activeOperationMessage = "Testing Apache Config…"
+        let httpdBin = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/httpd")
+        let result = await CommandExecutor.run(httpdBin, arguments: ["-t"])
+        isOperating = false
+        activeOperationMessage = nil
+        if result.isSuccess {
+            appendLog(level: .success, source: "Apache", message: "Apache syntax check: OK")
+        } else {
+            appendLog(level: .error, source: "Apache", message: "Apache syntax error: \(result.combinedOutput)")
+        }
+    }
+
+    public func openPhpInfo() {
+        if let url = URL(string: "http://localhost/dashboard/phpinfo.php") {
+            NSWorkspace.shared.open(url)
+            appendLog(level: .info, source: "PHP", message: "Opened phpinfo() in browser.")
+        }
+    }
+
     public func openConfigFile(path: String, name: String) {
         guard FileManager.default.fileExists(atPath: path) else {
             appendLog(level: .error, source: "Config", message: "File not found: \(path)")
