@@ -157,7 +157,8 @@ swift test
 ## 👤 Author
 
 **Isuru Indunil**
-- Email: [isuruindunil@hotmail.com](mailto:isuruindunil@hotmail.com)
+- Email: [hello@isuruindunil.me](mailto:hello@isuruindunil.me)
+- Website: [https://isuruindunil.me](https://isuruindunil.me)
 
 ---
 

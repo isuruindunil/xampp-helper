@@ -315,7 +315,12 @@ public struct SettingsView: View {
                 HStack {
                     Text("Contact:")
                         .foregroundColor(.secondary)
-                    Text("isuruindunil@hotmail.com")
+                    Text("hello@isuruindunil.me")
+                }
+                HStack {
+                    Text("Website:")
+                        .foregroundColor(.secondary)
+                    Text("https://isuruindunil.me")
                 }
                 HStack {
                     Text("App Version:")
