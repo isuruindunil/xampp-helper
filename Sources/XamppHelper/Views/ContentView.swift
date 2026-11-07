@@ -23,6 +23,7 @@ public struct ContentView: View {
                 }
             }
             .navigationTitle(selectedTab.rawValue)
+            .toolbarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if selectedTab != .dashboard {
