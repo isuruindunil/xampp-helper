@@ -60,6 +60,19 @@ public struct ContentView: View {
             }
         }
         .frame(minWidth: 760, idealWidth: 840, minHeight: 520, idealHeight: 600)
+        .background {
+            // macOS Global View Navigation Shortcuts (⌘1, ⌘2, ⌘3)
+            Group {
+                Button("") { selectedTab = .dashboard }
+                    .keyboardShortcut("1", modifiers: [.command])
+                Button("") { selectedTab = .logs }
+                    .keyboardShortcut("2", modifiers: [.command])
+                Button("") { selectedTab = .settings }
+                    .keyboardShortcut("3", modifiers: [.command])
+            }
+            .opacity(0)
+            .allowsHitTesting(false)
+        }
     }
 }
 
