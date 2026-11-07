@@ -1,5 +1,9 @@
 # XAMPP Helper for macOS
 
+[![Build & Test macOS](https://github.com/isuruindunil/xampp-helper/actions/workflows/build.yml/badge.svg)](https://github.com/isuruindunil/xampp-helper/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: macOS 14+](https://img.shields.io/badge/Platform-macOS%2014%2B-lightgrey.svg)](https://apple.com/macos)
+
 A native, lightweight macOS desktop application designed to easily **Start**, **Stop**, **Restart**, and **Monitor** your local XAMPP services (Apache and MySQL).
 
 ---
