@@ -214,12 +214,6 @@ public struct ServiceCardView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        case .proftpd:
-            return LinearGradient(
-                colors: [Color(red: 0.65, green: 0.35, blue: 0.90), Color(red: 0.48, green: 0.20, blue: 0.78)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         }
     }
 
@@ -227,7 +221,6 @@ public struct ServiceCardView: View {
         switch service {
         case .apache: return .red
         case .mysql: return .orange
-        case .proftpd: return .purple
         }
     }
 }

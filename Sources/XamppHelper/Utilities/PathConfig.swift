@@ -41,6 +41,10 @@ public struct PathConfig: Sendable {
         (logsPath as NSString).appendingPathComponent("access_log")
     }
 
+    public static var phpErrorLog: String {
+        (logsPath as NSString).appendingPathComponent("php_error_log")
+    }
+
     public static var phpIniPath: String {
         (etcPath as NSString).appendingPathComponent("php.ini")
     }
@@ -51,10 +55,6 @@ public struct PathConfig: Sendable {
 
     public static var myCnfPath: String {
         (etcPath as NSString).appendingPathComponent("my.cnf")
-    }
-
-    public static var proftpdConfPath: String {
-        (etcPath as NSString).appendingPathComponent("proftpd.conf")
     }
 
     public static var vhostsConfPath: String {

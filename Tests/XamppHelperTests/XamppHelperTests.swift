@@ -8,15 +8,12 @@ struct ServiceConfigurationTests {
     func serviceDefaults() {
         #expect(ServiceType.apache.defaultPort == 80)
         #expect(ServiceType.mysql.defaultPort == 3306)
-        #expect(ServiceType.proftpd.defaultPort == 21)
 
         #expect(ServiceType.apache.startAction == "startapache")
         #expect(ServiceType.mysql.startAction == "startmysql")
-        #expect(ServiceType.proftpd.startAction == "startftp")
 
         #expect(ServiceType.apache.stopAction == "stopapache")
         #expect(ServiceType.mysql.stopAction == "stopmysql")
-        #expect(ServiceType.proftpd.stopAction == "stopftp")
     }
 
     @Test("Path configuration correctly resolves paths")

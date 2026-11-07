@@ -80,7 +80,6 @@ public final class XamppManager: ObservableObject {
 
         var rawApacheRunning = false
         var rawMysqlRunning = false
-        var rawFtpRunning = false
 
         if statusrawResult.isSuccess {
             let output = statusrawResult.stdout
@@ -93,8 +92,6 @@ public final class XamppManager: ObservableObject {
                     rawApacheRunning = true
                 } else if trimmed == "MYSQL RUNNING" {
                     rawMysqlRunning = true
-                } else if trimmed == "PROFTPD RUNNING" {
-                    rawFtpRunning = true
                 }
             }
         }
@@ -102,27 +99,22 @@ public final class XamppManager: ObservableObject {
         // 2. Perform process checks via pgrep to ensure zero false-negatives
         let mysqlPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["mysqld"])
         let apachePgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["httpd"])
-        let ftpPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["proftpd"])
 
         // 3. Perform socket port checks
         let port3306Open = PortChecker.isPortOpen(port: 3306)
         let port80Open = PortChecker.isPortOpen(port: 80)
         let port443Open = PortChecker.isPortOpen(port: 443)
-        let port21Open = PortChecker.isPortOpen(port: 21)
 
         let isMysqlActive = rawMysqlRunning || mysqlPgrep.isSuccess || port3306Open
         let isApacheActive = rawApacheRunning || apachePgrep.isSuccess || port80Open || port443Open
-        let isFtpActive = rawFtpRunning || ftpPgrep.isSuccess || port21Open
 
         let mysqlPid = Int32(mysqlPgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
         let apachePid = Int32(apachePgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
-        let ftpPid = Int32(ftpPgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
 
         // Explicitly update all service states unconditionally with change notification
         objectWillChange.send()
         services[.apache] = ServiceInfo(type: .apache, state: isApacheActive ? .running : .stopped, port: 80, pid: isApacheActive ? apachePid : nil)
         services[.mysql] = ServiceInfo(type: .mysql, state: isMysqlActive ? .running : .stopped, port: 3306, pid: isMysqlActive ? mysqlPid : nil)
-        services[.proftpd] = ServiceInfo(type: .proftpd, state: isFtpActive ? .running : .stopped, port: 21, pid: isFtpActive ? ftpPid : nil)
     }
 
     public var activeCount: Int {
@@ -202,20 +194,25 @@ public final class XamppManager: ObservableObject {
 
     public func startAll() async {
         isOperating = true
-        activeOperationMessage = "Starting all XAMPP services…"
+        activeOperationMessage = "Starting Apache and MySQL…"
 
         objectWillChange.send()
         for type in ServiceType.allCases {
             services[type] = ServiceInfo(type: type, state: .starting)
         }
 
-        appendLog(level: .info, source: "Command", message: "Executing: xampp start")
-        let result = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["start"])
-        handleCommandResult(result, actionName: "start")
+        appendLog(level: .info, source: "Command", message: "Starting Apache Web Server...")
+        let apacheResult = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["startapache"])
+        handleCommandResult(apacheResult, actionName: "startapache")
+
+        appendLog(level: .info, source: "Command", message: "Starting MySQL Database...")
+        let mysqlResult = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["startmysql"])
+        handleCommandResult(mysqlResult, actionName: "startmysql")
 
         try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-        // Ensure MySQL actually started (workaround XAMPP stock script bugs)
+        // Ensure both started (with fallbacks)
+        await ensureServiceStarted(.apache)
         await ensureServiceStarted(.mysql)
 
         isOperating = false
@@ -225,21 +222,24 @@ public final class XamppManager: ObservableObject {
 
     public func stopAll() async {
         isOperating = true
-        activeOperationMessage = "Stopping all XAMPP services…"
+        activeOperationMessage = "Stopping Apache and MySQL…"
 
         objectWillChange.send()
         for type in ServiceType.allCases {
             services[type] = ServiceInfo(type: type, state: .stopping)
         }
 
-        appendLog(level: .info, source: "Command", message: "Executing: xampp stop")
-        let result = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["stop"])
-        handleCommandResult(result, actionName: "stop")
+        appendLog(level: .info, source: "Command", message: "Stopping Apache Web Server...")
+        let apacheResult = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["stopapache"])
+        handleCommandResult(apacheResult, actionName: "stopapache")
 
-        // Fallbacks: ensure MySQL and others are truly terminated
+        appendLog(level: .info, source: "Command", message: "Stopping MySQL Database...")
+        let mysqlResult = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["stopmysql"])
+        handleCommandResult(mysqlResult, actionName: "stopmysql")
+
+        // Fallbacks: ensure MySQL and Apache are truly terminated
         await ensureServiceStopped(.mysql)
         await ensureServiceStopped(.apache)
-        await ensureServiceStopped(.proftpd)
 
         try? await Task.sleep(nanoseconds: 800_000_000)
         isOperating = false
@@ -249,14 +249,14 @@ public final class XamppManager: ObservableObject {
 
     public func restartAll() async {
         isOperating = true
-        activeOperationMessage = "Restarting all XAMPP services…"
+        activeOperationMessage = "Restarting Apache and MySQL…"
 
         objectWillChange.send()
         for type in ServiceType.allCases {
             services[type] = ServiceInfo(type: type, state: .starting)
         }
 
-        appendLog(level: .info, source: "Command", message: "Executing: Restart All")
+        appendLog(level: .info, source: "Command", message: "Executing: Restart Apache & MySQL")
         await stopAll()
         try? await Task.sleep(nanoseconds: 600_000_000)
         await startAll()
@@ -341,11 +341,6 @@ public final class XamppManager: ObservableObject {
                     _ = await CommandExecutor.runElevated(command: "/usr/bin/killall", arguments: ["httpd"])
                 }
             }
-        case .proftpd:
-            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["proftpd"])
-            if pgrep.isSuccess {
-                _ = await CommandExecutor.runElevated(command: "/usr/bin/killall", arguments: ["proftpd"])
-            }
         }
     }
 
@@ -365,8 +360,6 @@ public final class XamppManager: ObservableObject {
                 let apachectl = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/apachectl")
                 _ = await CommandExecutor.runElevated(command: apachectl, arguments: ["start"])
             }
-        case .proftpd:
-            break
         }
     }
 

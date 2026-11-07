@@ -1,6 +1,6 @@
 # XAMPP Helper for macOS
 
-A native, lightweight macOS desktop application designed to easily **Start**, **Stop**, **Restart**, and **Monitor** your local XAMPP services (Apache, MySQL, and ProFTPD).
+A native, lightweight macOS desktop application designed to easily **Start**, **Stop**, **Restart**, and **Monitor** your local XAMPP services (Apache and MySQL).
 
 ---
 
@@ -8,21 +8,21 @@ A native, lightweight macOS desktop application designed to easily **Start**, **
 
 - **📊 Live Status Dashboard**: Real-time status indicators (Running, Stopped, Transitioning) for all services with automatic background polling.
 - **🚀 Global Controls**: One-click **Start All**, **Stop All**, and **Restart All** services.
-- **🎛️ Individual Service Controls**: Start, stop, or reload **Apache**, **MySQL**, and **ProFTPD** independently.
+- **🎛️ Individual Service Controls**: Start, stop, or reload **Apache** and **MySQL** independently.
 - **⚡ 1-Click Passwordless Sudo Helper**: Avoid entering Touch ID or your admin password every time you start/stop services. Configures a safe, scoped rule in `/etc/sudoers.d/xampp-helper` validated with `visudo`.
 - **🔗 Quick Shortcuts**:
   - Open `http://localhost` in default browser
   - Open `http://localhost/phpmyadmin` in default browser
   - Reveal `htdocs` web root directory in Finder
   - Reveal XAMPP root (`/Applications/XAMPP`) in Finder
-  - Open and edit `httpd.conf`, `php.ini`, `my.cnf`, and `proftpd.conf`
+  - Open and edit `httpd.conf`, `php.ini`, `my.cnf`, and `httpd-vhosts.conf`
   - Open XAMPP logs folder
 - **📜 Integrated Log Viewer**:
   - Live console output for all executed XAMPP commands and exit codes
   - Live tail of Apache `error_log`
   - Live tail of Apache `access_log`
   - Live tail of `php_error_log`
-  - Search/filter, copy to clipboard, and reveal in Finder
+  - Search/filter with keyword highlighting, copy to clipboard, and open in external editor
 - **🎨 Modern macOS Native UI**: Built with Swift 6 and SwiftUI, supporting Dark Mode, Light Mode, and macOS Human Interface Guidelines.
 
 ---
@@ -64,7 +64,7 @@ To rebuild the standalone `.app` bundle and Retina icon:
 
 ## 🔒 Passwordless Sudo Setup (Recommended)
 
-macOS requires root permissions to manage Apache (port 80) and ProFTPD (port 21). Without passwordless sudo, macOS prompts for your Touch ID or password on every action.
+macOS requires root permissions to manage Apache (port 80). Without passwordless sudo, macOS prompts for your Touch ID or password on every action.
 
 ### Automated Setup (via App)
 1. Open **XAMPP Helper**.
@@ -101,7 +101,7 @@ XamppHelper/
 │       │   ├── XamppHelperApp.swift # Main SwiftUI App entry point
 │       │   └── AppDelegate.swift    # macOS AppKit lifecycle
 │       ├── Models/
-│       │   ├── ServiceType.swift    # Apache, MySQL, ProFTPD enums & ports
+│       │   ├── ServiceType.swift    # Apache and MySQL enums & ports
 │       │   ├── ServiceStatus.swift  # Running, stopped, transitioning states
 │       │   └── LogEntry.swift       # Timestamped log records
 │       ├── Services/

@@ -76,9 +76,9 @@ public enum OverallStatus: String, Sendable {
 
     public var subtitle: String {
         switch self {
-        case .allRunning: return "Apache, MySQL, and FTP are active."
-        case .partiallyRunning: return "Some XAMPP services are running."
-        case .allStopped: return "No XAMPP services are currently running."
+        case .allRunning: return "Apache and MySQL are active."
+        case .partiallyRunning: return "One of your services is stopped."
+        case .allStopped: return "Apache and MySQL are stopped."
         case .unknown: return "Connecting to XAMPP daemon…"
         }
     }

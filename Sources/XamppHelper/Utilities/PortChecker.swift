@@ -38,20 +38,18 @@ public enum PortChecker: Sendable {
         return result == 0
     }
 
-    /// Check standard XAMPP ports for availability and potential conflicts.
-    public static func checkStandardPorts(apacheRunning: Bool, mysqlRunning: Bool, ftpRunning: Bool) async -> [PortStatus] {
+    /// Check standard XAMPP ports (80, 443, 3306) for availability and potential conflicts.
+    public static func checkStandardPorts(apacheRunning: Bool, mysqlRunning: Bool) async -> [PortStatus] {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let open80 = isPortOpen(port: 80)
                 let open443 = isPortOpen(port: 443)
                 let open3306 = isPortOpen(port: 3306)
-                let open21 = isPortOpen(port: 21)
 
                 let statuses = [
                     PortStatus(port: 80, serviceName: "Apache HTTP", isListening: open80, isOccupiedByXampp: apacheRunning),
                     PortStatus(port: 443, serviceName: "Apache HTTPS (SSL)", isListening: open443, isOccupiedByXampp: apacheRunning),
-                    PortStatus(port: 3306, serviceName: "MySQL", isListening: open3306, isOccupiedByXampp: mysqlRunning),
-                    PortStatus(port: 21, serviceName: "ProFTPD", isListening: open21, isOccupiedByXampp: ftpRunning)
+                    PortStatus(port: 3306, serviceName: "MySQL / MariaDB", isListening: open3306, isOccupiedByXampp: mysqlRunning)
                 ]
                 continuation.resume(returning: statuses)
             }

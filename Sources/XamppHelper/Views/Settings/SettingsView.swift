@@ -68,7 +68,7 @@ public struct SettingsView: View {
                 )
             }
 
-            Text("macOS requires root privileges to control Apache and ProFTPD. By default, XAMPP Helper prompts for Touch ID or your password each time. Configuring passwordless sudo allows instant 1-click start and stop.")
+            Text("macOS requires root privileges to control Apache. By default, XAMPP Helper prompts for Touch ID or your password each time. Configuring passwordless sudo allows instant 1-click start and stop.")
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
 
@@ -367,11 +367,9 @@ public struct SettingsView: View {
         Task {
             let apacheActive = manager.services[.apache]?.state == .running
             let mysqlActive = manager.services[.mysql]?.state == .running
-            let ftpActive = manager.services[.proftpd]?.state == .running
             let results = await PortChecker.checkStandardPorts(
                 apacheRunning: apacheActive,
-                mysqlRunning: mysqlActive,
-                ftpRunning: ftpActive
+                mysqlRunning: mysqlActive
             )
             DispatchQueue.main.async {
                 self.portStatuses = results

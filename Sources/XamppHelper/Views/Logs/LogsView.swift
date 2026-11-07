@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 public enum LogSourceTab: String, CaseIterable, Identifiable {
     case console = "Console"
@@ -16,6 +17,15 @@ public enum LogSourceTab: String, CaseIterable, Identifiable {
         case .phpError: return "curlybraces"
         }
     }
+
+    public var fileName: String? {
+        switch self {
+        case .console: return nil
+        case .apacheError: return "error_log"
+        case .apacheAccess: return "access_log"
+        case .phpError: return "php_error_log"
+        }
+    }
 }
 
 public struct LogsView: View {
@@ -25,10 +35,15 @@ public struct LogsView: View {
     @State private var fileLogLines: [String] = []
     @State private var isRefreshingFileLog: Bool = false
     @State private var newestOnTop: Bool = true
+    @State private var justCopied: Bool = false
+
+    public init(manager: XamppManager) {
+        self.manager = manager
+    }
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Responsive Top Toolbar
+            // Modern, responsive two-row toolbar (guaranteed zero clipping)
             toolbarHeader
 
             Divider()
@@ -61,89 +76,94 @@ public struct LogsView: View {
         }
     }
 
-    // MARK: - Toolbar Header (Responsive with ViewThatFits)
+    // MARK: - Toolbar Header
 
     private var toolbarHeader: some View {
-        ViewThatFits(in: .horizontal) {
-            // Wide Window: Single row
+        VStack(spacing: 9) {
+            // Row 1: Source Tabs on Left + Action Tools on Right
             HStack(spacing: 10) {
-                logSourcePicker
+                customTabSwitcher
 
                 Spacer(minLength: 8)
 
-                filterSearchField
-                    .frame(minWidth: 90, idealWidth: 120, maxWidth: 160)
-
                 actionButtonsGroup
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Compact / Narrow Window: Two neat rows (Zero overflow)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    logSourcePicker
-                    Spacer(minLength: 6)
-                    actionButtonsGroup
-                }
+            // Row 2: Search Filter & Diagnostics
+            HStack(spacing: 8) {
                 filterSearchField
-                    .frame(maxWidth: .infinity)
+
+                if !filterText.isEmpty {
+                    matchCountBadge
+                }
+
+                if let fileName = selectedTab.fileName {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                        Text("logs/\(fileName)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+                    )
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: - Subcomponents
+    // MARK: - Custom Tab Switcher (SwiftUI Native)
 
-    private var logSourcePicker: some View {
-        Picker("", selection: $selectedTab) {
+    private var customTabSwitcher: some View {
+        HStack(spacing: 2) {
             ForEach(LogSourceTab.allCases) { tab in
-                Text(tab.rawValue)
-                    .tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
-        .controlSize(.small)
-        .labelsHidden()
-    }
-
-    private var filterSearchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-
-            TextField("Filter logs…", text: $filterText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 11))
-
-            if !filterText.isEmpty {
                 Button {
-                    filterText = ""
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selectedTab = tab
+                    }
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 10, weight: .semibold))
+
+                        Text(tab.rawValue)
+                            .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .medium))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(selectedTab == tab ? Color.accentColor : Color.clear)
+                    )
+                    .foregroundColor(selectedTab == tab ? .white : .primary)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(3)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
         )
+        .fixedSize()
     }
 
+    // MARK: - Action Buttons
+
     private var actionButtonsGroup: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             // Sort order toggle
             Button {
                 newestOnTop.toggle()
@@ -153,7 +173,7 @@ public struct LogsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .help(newestOnTop ? "Order: Newest at top" : "Order: Oldest at top")
+            .help(newestOnTop ? "Sort: Newest at top" : "Sort: Oldest at top")
 
             // Clear console or reload file
             if selectedTab == .console {
@@ -180,16 +200,38 @@ public struct LogsView: View {
                 .help("Reload Log File")
             }
 
-            // Copy
+            // Copy with instant feedback
             Button {
                 copyCurrentLogs()
             } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 11))
+                HStack(spacing: 4) {
+                    Image(systemName: justCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11, weight: justCopied ? .bold : .regular))
+                        .foregroundColor(justCopied ? .green : .primary)
+
+                    if justCopied {
+                        Text("Copied!")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.green)
+                    }
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .help("Copy All Logs to Clipboard")
+            .help("Copy All Displayed Logs to Clipboard")
+
+            // Open in TextEdit / Default External Editor (for file logs)
+            if selectedTab != .console {
+                Button {
+                    openInExternalEditor()
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Open Log File in Default Text Editor")
+            }
 
             // Reveal in Finder
             Button {
@@ -201,6 +243,75 @@ public struct LogsView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help("Open Logs Folder in Finder")
+        }
+    }
+
+    // MARK: - Search Field
+
+    private var filterSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            TextField("Filter logs by keyword, status code, or client IP…", text: $filterText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+
+            if !filterText.isEmpty {
+                Button {
+                    filterText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    private var matchCountBadge: some View {
+        let count = currentFilteredCount
+        return HStack(spacing: 4) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .font(.system(size: 10))
+            Text("\(count) match\(count == 1 ? "" : "es")")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+        }
+        .foregroundColor(.orange)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(Color.orange.opacity(0.12))
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 0.8)
+        )
+    }
+
+    private var currentFilteredCount: Int {
+        if selectedTab == .console {
+            return manager.consoleLogs.filter { entry in
+                entry.message.localizedCaseInsensitiveContains(filterText) ||
+                entry.source.localizedCaseInsensitiveContains(filterText)
+            }.count
+        } else {
+            return fileLogLines.filter { line in
+                line.localizedCaseInsensitiveContains(filterText)
+            }.count
         }
     }
 
@@ -216,7 +327,7 @@ public struct LogsView: View {
         let displayEntries = newestOnTop ? filtered : filtered.reversed()
 
         return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 4) {
+            LazyVStack(alignment: .leading, spacing: 3) {
                 if displayEntries.isEmpty {
                     emptyStateView(
                         title: filterText.isEmpty ? "No Console Activity Yet" : "No Matches Found",
@@ -228,8 +339,8 @@ public struct LogsView: View {
                             // Line number
                             Text("\(index + 1)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(.secondary.opacity(0.5))
-                                .frame(width: 28, alignment: .trailing)
+                                .foregroundColor(.secondary.opacity(0.45))
+                                .frame(width: 32, alignment: .trailing)
 
                             // Timestamp
                             Text(entry.formattedTimestamp)
@@ -241,9 +352,8 @@ public struct LogsView: View {
                             sourcePill(entry.source, level: entry.level)
 
                             // Message content
-                            Text(entry.message)
+                            highlightedLogText(entry.message, baseColor: messageColor(for: entry))
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(messageColor(for: entry))
                                 .lineSpacing(2)
                                 .textSelection(.enabled)
 
@@ -283,12 +393,11 @@ public struct LogsView: View {
                         HStack(alignment: .top, spacing: 10) {
                             Text("\(index + 1)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(.secondary.opacity(0.5))
-                                .frame(width: 32, alignment: .trailing)
+                                .foregroundColor(.secondary.opacity(0.45))
+                                .frame(width: 36, alignment: .trailing)
 
-                            Text(line)
+                            highlightedLogText(line, baseColor: logLineColor(for: line))
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(logLineColor(for: line))
                                 .lineSpacing(2)
                                 .textSelection(.enabled)
 
@@ -313,7 +422,7 @@ public struct LogsView: View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(Color.green.opacity(0.8))
+                    .fill(Color.green.opacity(0.85))
                     .frame(width: 6, height: 6)
 
                 Text(selectedTab.rawValue)
@@ -331,7 +440,11 @@ public struct LogsView: View {
                 .foregroundColor(.secondary)
 
             if !filterText.isEmpty {
-                Text("(filtered by '\(filterText)')")
+                Text("•")
+                    .foregroundColor(.secondary.opacity(0.4))
+                    .font(.system(size: 10))
+
+                Text("Filtered by '\(filterText)'")
                     .font(.system(size: 11))
                     .foregroundColor(.orange)
             }
@@ -348,6 +461,23 @@ public struct LogsView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: - Highlighted Text Helper
+
+    private func highlightedLogText(_ text: String, baseColor: Color) -> Text {
+        guard !filterText.isEmpty,
+              let range = text.range(of: filterText, options: .caseInsensitive) else {
+            return Text(text).foregroundColor(baseColor)
+        }
+
+        let before = String(text[..<range.lowerBound])
+        let match = String(text[range])
+        let after = String(text[range.upperBound...])
+
+        return Text(before).foregroundColor(baseColor)
+            + Text(match).foregroundColor(.orange).bold()
+            + highlightedLogText(after, baseColor: baseColor)
     }
 
     // MARK: - Helper Views & Functions
@@ -374,7 +504,6 @@ public struct LogsView: View {
         case "command": return .cyan
         case "mysql": return .orange
         case "apache": return .red
-        case "proftpd": return .purple
         case "sudo": return .green
         default: return .blue
         }
@@ -429,7 +558,7 @@ public struct LogsView: View {
         case .console: return
         case .apacheError: path = PathConfig.apacheErrorLog
         case .apacheAccess: path = PathConfig.apacheAccessLog
-        case .phpError: path = (PathConfig.logsPath as NSString).appendingPathComponent("php_error_log")
+        case .phpError: path = PathConfig.phpErrorLog
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -452,5 +581,25 @@ public struct LogsView: View {
             let content = fileLogLines.joined(separator: "\n")
             pasteboard.setString(content, forType: .string)
         }
+
+        justCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            self.justCopied = false
+        }
+    }
+
+    private func openInExternalEditor() {
+        let path: String
+        switch selectedTab {
+        case .console: return
+        case .apacheError: path = PathConfig.apacheErrorLog
+        case .apacheAccess: path = PathConfig.apacheAccessLog
+        case .phpError: path = PathConfig.phpErrorLog
+        }
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            return
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 }
