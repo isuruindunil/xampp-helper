@@ -56,7 +56,7 @@ public struct ContentView: View {
                 }
             }
         }
-        .frame(minWidth: 720, idealWidth: 800, minHeight: 520, idealHeight: 580)
+        .frame(minWidth: 760, idealWidth: 840, minHeight: 520, idealHeight: 600)
     }
 }
 

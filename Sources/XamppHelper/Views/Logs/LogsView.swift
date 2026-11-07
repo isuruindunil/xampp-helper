@@ -25,20 +25,17 @@ public struct LogsView: View {
     @State private var fileLogLines: [String] = []
     @State private var isRefreshingFileLog: Bool = false
     @State private var newestOnTop: Bool = true
-    @State private var autoScroll: Bool = true
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Top Control Toolbar
+            // Responsive Top Toolbar
             toolbarHeader
 
             Divider()
 
             // Main Log Content Area
             ZStack {
-                // Sleek terminal background
                 Color(nsColor: .underPageBackgroundColor)
-                    .ignoresSafeArea()
 
                 if selectedTab == .console {
                     consoleLogList
@@ -64,105 +61,147 @@ public struct LogsView: View {
         }
     }
 
-    // MARK: - Toolbar Header
+    // MARK: - Toolbar Header (Responsive with ViewThatFits)
 
     private var toolbarHeader: some View {
-        HStack(spacing: 10) {
-            // Source Picker
-            Picker("", selection: $selectedTab) {
-                ForEach(LogSourceTab.allCases) { tab in
-                    Text(tab.rawValue)
-                        .tag(tab)
-                }
+        ViewThatFits(in: .horizontal) {
+            // Wide Window: Single row
+            HStack(spacing: 10) {
+                logSourcePicker
+
+                Spacer(minLength: 8)
+
+                filterSearchField
+                    .frame(minWidth: 90, idealWidth: 120, maxWidth: 160)
+
+                actionButtonsGroup
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(minWidth: 260, maxWidth: 320)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 8)
-
-            // Search / Filter Field
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-
-                TextField("Filter logs…", text: $filterText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                    .frame(minWidth: 80, idealWidth: 110, maxWidth: 140)
-
-                if !filterText.isEmpty {
-                    Button {
-                        filterText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
+            // Compact / Narrow Window: Two neat rows (Zero overflow)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    logSourcePicker
+                    Spacer(minLength: 6)
+                    actionButtonsGroup
                 }
+                filterSearchField
+                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
-            )
-
-            // Action Buttons
-            HStack(spacing: 4) {
-                // Clear console or reload file
-                if selectedTab == .console {
-                    Button {
-                        manager.clearConsoleLogs()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.bordered)
-                    .help("Clear Console Output")
-                } else {
-                    Button {
-                        loadFileLogs()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11))
-                            .rotationEffect(.degrees(isRefreshingFileLog ? 360 : 0))
-                            .animation(isRefreshingFileLog ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: isRefreshingFileLog)
-                    }
-                    .buttonStyle(.bordered)
-                    .help("Reload Log File")
-                }
-
-                // Copy
-                Button {
-                    copyCurrentLogs()
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .help("Copy All Logs to Clipboard")
-
-                // Reveal in Finder
-                Button {
-                    manager.openLogsFolder()
-                } label: {
-                    Image(systemName: "folder")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.bordered)
-                .help("Open Logs Folder in Finder")
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: - Subcomponents
+
+    private var logSourcePicker: some View {
+        Picker("", selection: $selectedTab) {
+            ForEach(LogSourceTab.allCases) { tab in
+                Text(tab.rawValue)
+                    .tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .labelsHidden()
+    }
+
+    private var filterSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            TextField("Filter logs…", text: $filterText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+
+            if !filterText.isEmpty {
+                Button {
+                    filterText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    private var actionButtonsGroup: some View {
+        HStack(spacing: 4) {
+            // Sort order toggle
+            Button {
+                newestOnTop.toggle()
+            } label: {
+                Image(systemName: newestOnTop ? "arrow.down.to.line" : "arrow.up.to.line")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help(newestOnTop ? "Order: Newest at top" : "Order: Oldest at top")
+
+            // Clear console or reload file
+            if selectedTab == .console {
+                Button {
+                    manager.clearConsoleLogs()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Clear Console Output")
+            } else {
+                Button {
+                    loadFileLogs()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11))
+                        .rotationEffect(.degrees(isRefreshingFileLog ? 360 : 0))
+                        .animation(isRefreshingFileLog ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: isRefreshingFileLog)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Reload Log File")
+            }
+
+            // Copy
+            Button {
+                copyCurrentLogs()
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Copy All Logs to Clipboard")
+
+            // Reveal in Finder
+            Button {
+                manager.openLogsFolder()
+            } label: {
+                Image(systemName: "folder")
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Open Logs Folder in Finder")
+        }
     }
 
     // MARK: - Console Log List
@@ -176,52 +215,50 @@ public struct LogsView: View {
 
         let displayEntries = newestOnTop ? filtered : filtered.reversed()
 
-        return ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    if displayEntries.isEmpty {
-                        emptyStateView(
-                            title: filterText.isEmpty ? "No Console Activity Yet" : "No Matches Found",
-                            subtitle: filterText.isEmpty ? "Executed commands and daemon status output will appear here." : "Try adjusting your search filter."
-                        )
-                    } else {
-                        ForEach(Array(displayEntries.enumerated()), id: \.element.id) { index, entry in
-                            HStack(alignment: .top, spacing: 10) {
-                                // Index / Line number
-                                Text("\(index + 1)")
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundColor(.secondary.opacity(0.5))
-                                    .frame(width: 32, alignment: .trailing)
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 4) {
+                if displayEntries.isEmpty {
+                    emptyStateView(
+                        title: filterText.isEmpty ? "No Console Activity Yet" : "No Matches Found",
+                        subtitle: filterText.isEmpty ? "Executed commands and status output will appear here." : "Try adjusting your search filter."
+                    )
+                } else {
+                    ForEach(Array(displayEntries.enumerated()), id: \.element.id) { index, entry in
+                        HStack(alignment: .top, spacing: 10) {
+                            // Line number
+                            Text("\(index + 1)")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .frame(width: 28, alignment: .trailing)
 
-                                // Timestamp
-                                Text(entry.formattedTimestamp)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 60, alignment: .leading)
+                            // Timestamp
+                            Text(entry.formattedTimestamp)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .frame(width: 58, alignment: .leading)
 
-                                // Source Badge
-                                sourcePill(entry.source, level: entry.level)
+                            // Source Badge
+                            sourcePill(entry.source, level: entry.level)
 
-                                // Message content with multi-line support
-                                Text(entry.message)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(messageColor(for: entry))
-                                    .lineSpacing(2)
-                                    .textSelection(.enabled)
+                            // Message content
+                            Text(entry.message)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(messageColor(for: entry))
+                                .lineSpacing(2)
+                                .textSelection(.enabled)
 
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 3)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(entry.level == .error ? Color.red.opacity(0.08) : Color.clear)
-                            )
+                            Spacer()
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(entry.level == .error ? Color.red.opacity(0.08) : Color.clear)
+                        )
                     }
                 }
-                .padding(.vertical, 8)
             }
+            .padding(.vertical, 8)
         }
     }
 
@@ -244,13 +281,11 @@ public struct LogsView: View {
                 } else {
                     ForEach(Array(displayLines.enumerated()), id: \.offset) { index, line in
                         HStack(alignment: .top, spacing: 10) {
-                            // Line Number
                             Text("\(index + 1)")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundColor(.secondary.opacity(0.5))
-                                .frame(width: 36, alignment: .trailing)
+                                .frame(width: 32, alignment: .trailing)
 
-                            // Log Line Text
                             Text(line)
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundColor(logLineColor(for: line))
@@ -331,7 +366,7 @@ public struct LogsView: View {
                 Capsule()
                     .strokeBorder(sourceColor(source).opacity(0.25), lineWidth: 0.8)
             )
-            .frame(width: 75, alignment: .leading)
+            .frame(width: 68, alignment: .leading)
     }
 
     private func sourceColor(_ source: String) -> Color {
