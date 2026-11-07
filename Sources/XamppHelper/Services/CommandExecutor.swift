@@ -18,7 +18,7 @@ public struct CommandResult: Sendable {
     }
 }
 
-public enum CommandExecutor {
+public enum CommandExecutor: Sendable {
     /// Execute a standard shell command as the current user.
     public static func run(
         _ executable: String,
@@ -74,6 +74,13 @@ public enum CommandExecutor {
         return result.isSuccess
     }
 
+    /// Safely escapes a string literal for inclusion inside AppleScript `do shell script "..."`
+    public static func escapeForAppleScript(_ string: String) -> String {
+        return string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
     /// Run a command with elevated privileges.
     /// If passwordless sudo is available, it uses `sudo -n`.
     /// Otherwise, it prompts the user using AppleScript with administrator privileges.
@@ -90,8 +97,11 @@ public enum CommandExecutor {
         }
 
         // 2. If sudo -n failed because of password requirement, use AppleScript
-        let escapedArgs = fullArgs.map { "\"\($0.replacingOccurrences(of: "\"", with: "\\\""))\"" }.joined(separator: " ")
-        let script = "do shell script \"\(escapedArgs)\" with administrator privileges"
+        let quotedShellArgs = fullArgs.map { arg in
+            "\"\(arg.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
+        }.joined(separator: " ")
+
+        let script = "do shell script \"\(escapeForAppleScript(quotedShellArgs))\" with administrator privileges"
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -124,4 +134,3 @@ public enum CommandExecutor {
         }
     }
 }
-

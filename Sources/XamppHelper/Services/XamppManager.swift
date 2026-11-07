@@ -100,16 +100,21 @@ public final class XamppManager: ObservableObject {
         }
 
         // 2. Perform process checks via pgrep to ensure zero false-negatives
-        // (XAMPP's statusraw can report MYSQL NOTRUNNING when running without root due to /var/mysql permissions)
-        let mysqlPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["-f", "/Applications/XAMPP/xamppfiles/sbin/mysqld"])
-        let apachePgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["-f", "/Applications/XAMPP/xamppfiles/bin/httpd"])
-        let ftpPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["-f", "/Applications/XAMPP/xamppfiles/sbin/proftpd"])
+        let mysqlPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["mysqld"])
+        let apachePgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["httpd"])
+        let ftpPgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["proftpd"])
 
-        let isMysqlActive = rawMysqlRunning || mysqlPgrep.isSuccess
-        let isApacheActive = rawApacheRunning || apachePgrep.isSuccess
-        let isFtpActive = rawFtpRunning || ftpPgrep.isSuccess
+        // 3. Perform socket port checks
+        let port3306Open = PortChecker.isPortOpen(port: 3306)
+        let port80Open = PortChecker.isPortOpen(port: 80)
+        let port443Open = PortChecker.isPortOpen(port: 443)
+        let port21Open = PortChecker.isPortOpen(port: 21)
 
-        // Update states unless currently transitioning
+        let isMysqlActive = rawMysqlRunning || mysqlPgrep.isSuccess || port3306Open
+        let isApacheActive = rawApacheRunning || apachePgrep.isSuccess || port80Open || port443Open
+        let isFtpActive = rawFtpRunning || ftpPgrep.isSuccess || port21Open
+
+        // Update states unless actively transitioning
         if services[.apache]?.state.isTransitioning != true {
             services[.apache]?.state = isApacheActive ? .running : .stopped
         }
@@ -192,80 +197,168 @@ public final class XamppManager: ObservableObject {
     // MARK: - Control Actions
 
     public func startAll() async {
-        await executeGlobalAction("start", label: "Starting all XAMPP services…")
-    }
-
-    public func stopAll() async {
-        await executeGlobalAction("stop", label: "Stopping all XAMPP services…")
-    }
-
-    public func restartAll() async {
-        await executeGlobalAction("restart", label: "Restarting all XAMPP services…")
-    }
-
-    public func start(service: ServiceType) async {
-        await executeServiceAction(service: service, action: service.startAction, label: "Starting \(service.rawValue)…")
-    }
-
-    public func stop(service: ServiceType) async {
-        await executeServiceAction(service: service, action: service.stopAction, label: "Stopping \(service.rawValue)…")
-    }
-
-    public func restart(service: ServiceType) async {
-        await executeServiceAction(service: service, action: service.reloadAction, label: "Restarting \(service.rawValue)…")
-    }
-
-    private func executeGlobalAction(_ action: String, label: String) async {
         isOperating = true
-        activeOperationMessage = label
+        activeOperationMessage = "Starting all XAMPP services…"
 
         for type in ServiceType.allCases {
-            if action == "stop" {
-                services[type]?.state = .stopping
-            } else {
-                services[type]?.state = .starting
-            }
+            services[type]?.state = .starting
         }
 
-        appendLog(level: .info, source: "Command", message: "Executing: xampp \(action)")
+        appendLog(level: .info, source: "Command", message: "Executing: xampp start")
+        let result = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["start"])
+        handleCommandResult(result, actionName: "start")
 
-        let result = await CommandExecutor.runElevated(
-            command: PathConfig.xamppScript,
-            arguments: [action]
-        )
-
-        handleCommandResult(result, actionName: action)
-
-        // Wait brief moment for processes to settle
         try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+        // Ensure MySQL actually started (workaround XAMPP stock script bugs)
+        await ensureServiceStarted(.mysql)
+
         isOperating = false
         activeOperationMessage = nil
         await refreshStatus()
     }
 
-    private func executeServiceAction(service: ServiceType, action: String, label: String) async {
+    public func stopAll() async {
         isOperating = true
-        activeOperationMessage = label
+        activeOperationMessage = "Stopping all XAMPP services…"
 
-        if action.starts(with: "stop") {
-            services[service]?.state = .stopping
-        } else {
-            services[service]?.state = .starting
+        for type in ServiceType.allCases {
+            services[type]?.state = .stopping
         }
 
-        appendLog(level: .info, source: "Command", message: "Executing: xampp \(action)")
+        appendLog(level: .info, source: "Command", message: "Executing: xampp stop")
+        let result = await CommandExecutor.runElevated(command: PathConfig.xamppScript, arguments: ["stop"])
+        handleCommandResult(result, actionName: "stop")
 
-        let result = await CommandExecutor.runElevated(
-            command: PathConfig.xamppScript,
-            arguments: [action]
-        )
-
-        handleCommandResult(result, actionName: action)
+        // Crucial fallback: ensure MySQL and others are truly terminated
+        await ensureServiceStopped(.mysql)
+        await ensureServiceStopped(.apache)
+        await ensureServiceStopped(.proftpd)
 
         try? await Task.sleep(nanoseconds: 800_000_000)
         isOperating = false
         activeOperationMessage = nil
         await refreshStatus()
+    }
+
+    public func restartAll() async {
+        isOperating = true
+        activeOperationMessage = "Restarting all XAMPP services…"
+
+        for type in ServiceType.allCases {
+            services[type]?.state = .starting
+        }
+
+        appendLog(level: .info, source: "Command", message: "Executing: Restart All")
+        await stopAll()
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        await startAll()
+    }
+
+    public func start(service: ServiceType) async {
+        await executeServiceAction(service: service, isStarting: true)
+    }
+
+    public func stop(service: ServiceType) async {
+        await executeServiceAction(service: service, isStarting: false)
+    }
+
+    public func restart(service: ServiceType) async {
+        isOperating = true
+        activeOperationMessage = "Restarting \(service.rawValue)…"
+        services[service]?.state = .starting
+
+        appendLog(level: .info, source: "Command", message: "Restarting \(service.rawValue)...")
+        await stop(service: service)
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        await start(service: service)
+    }
+
+    private func executeServiceAction(service: ServiceType, isStarting: Bool) async {
+        isOperating = true
+        let action = isStarting ? service.startAction : service.stopAction
+        activeOperationMessage = isStarting ? "Starting \(service.rawValue)…" : "Stopping \(service.rawValue)…"
+        services[service]?.state = isStarting ? .starting : .stopping
+
+        appendLog(level: .info, source: "Command", message: "Executing: xampp \(action)")
+
+        let result = await CommandExecutor.runElevated(
+            command: PathConfig.xamppScript,
+            arguments: [action]
+        )
+
+        handleCommandResult(result, actionName: action)
+
+        if isStarting {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            await ensureServiceStarted(service)
+        } else {
+            await ensureServiceStopped(service)
+        }
+
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        isOperating = false
+        activeOperationMessage = nil
+        await refreshStatus()
+    }
+
+    /// Guaranteed termination of leftover processes when stock XAMPP scripts fail to stop them
+    private func ensureServiceStopped(_ service: ServiceType) async {
+        switch service {
+        case .mysql:
+            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["mysqld"])
+            if pgrep.isSuccess {
+                // 1. Gracefully shutdown via mysqladmin
+                let mysqladmin = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/mysqladmin")
+                _ = await CommandExecutor.run(mysqladmin, arguments: ["-u", "root", "shutdown"])
+                try? await Task.sleep(nanoseconds: 600_000_000)
+
+                // 2. If still active, terminate via elevated kill
+                let checkAgain = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["mysqld"])
+                if checkAgain.isSuccess {
+                    appendLog(level: .warning, source: "MySQL", message: "Graceful shutdown timed out; terminating mysqld process...")
+                    _ = await CommandExecutor.runElevated(command: "/usr/bin/killall", arguments: ["-9", "mysqld"])
+                }
+            }
+        case .apache:
+            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["httpd"])
+            if pgrep.isSuccess {
+                let apachectl = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/apachectl")
+                _ = await CommandExecutor.runElevated(command: apachectl, arguments: ["stop"])
+                try? await Task.sleep(nanoseconds: 500_000_000)
+
+                let checkAgain = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["httpd"])
+                if checkAgain.isSuccess {
+                    _ = await CommandExecutor.runElevated(command: "/usr/bin/killall", arguments: ["httpd"])
+                }
+            }
+        case .proftpd:
+            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["proftpd"])
+            if pgrep.isSuccess {
+                _ = await CommandExecutor.runElevated(command: "/usr/bin/killall", arguments: ["proftpd"])
+            }
+        }
+    }
+
+    /// Guaranteed startup fallback if stock XAMPP script had issues with pid files
+    private func ensureServiceStarted(_ service: ServiceType) async {
+        switch service {
+        case .mysql:
+            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["mysqld"])
+            if !pgrep.isSuccess && !PortChecker.isPortOpen(port: 3306) {
+                appendLog(level: .info, source: "MySQL", message: "Launching MySQL via mysql.server...")
+                let mysqlServer = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/mysql.server")
+                _ = await CommandExecutor.runElevated(command: mysqlServer, arguments: ["start"])
+            }
+        case .apache:
+            let pgrep = await CommandExecutor.run("/usr/bin/pgrep", arguments: ["httpd"])
+            if !pgrep.isSuccess && !PortChecker.isPortOpen(port: 80) {
+                let apachectl = (PathConfig.xamppfilesPath as NSString).appendingPathComponent("bin/apachectl")
+                _ = await CommandExecutor.runElevated(command: apachectl, arguments: ["start"])
+            }
+        case .proftpd:
+            break
+        }
     }
 
     private func handleCommandResult(_ result: CommandResult, actionName: String) {
@@ -274,13 +367,13 @@ public final class XamppManager: ObservableObject {
             appendLog(
                 level: .success,
                 source: "Command",
-                message: output.isEmpty ? "Command 'xampp \(actionName)' executed successfully." : output
+                message: output.isEmpty ? "Command 'xampp \(actionName)' completed." : output
             )
         } else {
             appendLog(
                 level: .error,
                 source: "Command",
-                message: "Error executing 'xampp \(actionName)': \(output)"
+                message: "Command 'xampp \(actionName)' error: \(output)"
             )
         }
     }
@@ -368,4 +461,3 @@ public final class XamppManager: ObservableObject {
         appendLog(level: .info, source: "Finder", message: "Revealed \(name) folder in Finder.")
     }
 }
-

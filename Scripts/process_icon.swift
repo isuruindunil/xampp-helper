@@ -78,3 +78,4 @@ guard let tiffData = outputImage.tiffRepresentation,
 
 try pngData.write(to: URL(fileURLWithPath: outputPath))
 print("Successfully generated masked macOS icon at \(outputPath)")
+
