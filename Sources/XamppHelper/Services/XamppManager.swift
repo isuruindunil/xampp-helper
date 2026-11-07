@@ -114,11 +114,19 @@ public final class XamppManager: ObservableObject {
         let isApacheActive = rawApacheRunning || apachePgrep.isSuccess || port80Open || port443Open
         let isFtpActive = rawFtpRunning || ftpPgrep.isSuccess || port21Open
 
+        let mysqlPid = Int32(mysqlPgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
+        let apachePid = Int32(apachePgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
+        let ftpPid = Int32(ftpPgrep.stdout.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: .newlines).first ?? "")
+
         // Explicitly update all service states unconditionally with change notification
         objectWillChange.send()
-        services[.apache] = ServiceInfo(type: .apache, state: isApacheActive ? .running : .stopped)
-        services[.mysql] = ServiceInfo(type: .mysql, state: isMysqlActive ? .running : .stopped)
-        services[.proftpd] = ServiceInfo(type: .proftpd, state: isFtpActive ? .running : .stopped)
+        services[.apache] = ServiceInfo(type: .apache, state: isApacheActive ? .running : .stopped, port: 80, pid: isApacheActive ? apachePid : nil)
+        services[.mysql] = ServiceInfo(type: .mysql, state: isMysqlActive ? .running : .stopped, port: 3306, pid: isMysqlActive ? mysqlPid : nil)
+        services[.proftpd] = ServiceInfo(type: .proftpd, state: isFtpActive ? .running : .stopped, port: 21, pid: isFtpActive ? ftpPid : nil)
+    }
+
+    public var activeCount: Int {
+        services.values.filter { $0.state == .running }.count
     }
 
     private func updateOverallStatus() {

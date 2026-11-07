@@ -4,108 +4,141 @@ public struct QuickLinksView: View {
     @ObservedObject var manager: XamppManager
 
     private let columns = [
-        GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 10)
+        GridItem(.adaptive(minimum: 155, maximum: 220), spacing: 12)
     ]
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Quick Links & Shortcuts")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.secondary)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
 
-            LazyVGrid(columns: columns, spacing: 10) {
-                QuickLinkButton(
-                    title: "Localhost",
-                    subtitle: "http://localhost",
-                    systemImage: "safari.fill",
-                    accentColor: .blue
-                ) {
-                    manager.openLocalhost()
+            // Web Apps Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("WEB APPLICATIONS")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                LazyVGrid(columns: columns, spacing: 10) {
+                    QuickLinkTile(
+                        title: "Localhost",
+                        subtitle: "http://localhost",
+                        systemImage: "safari.fill",
+                        tintColor: .blue
+                    ) {
+                        manager.openLocalhost()
+                    }
+
+                    QuickLinkTile(
+                        title: "phpMyAdmin",
+                        subtitle: "Database GUI",
+                        systemImage: "server.rack",
+                        tintColor: .orange
+                    ) {
+                        manager.openPhpMyAdmin()
+                    }
+
+                    QuickLinkTile(
+                        title: "phpinfo()",
+                        subtitle: "PHP Configuration",
+                        systemImage: "info.circle.fill",
+                        tintColor: .indigo
+                    ) {
+                        manager.openPhpInfo()
+                    }
                 }
+            }
 
-                QuickLinkButton(
-                    title: "phpMyAdmin",
-                    subtitle: "Database GUI",
-                    systemImage: "server.rack",
-                    accentColor: .orange
-                ) {
-                    manager.openPhpMyAdmin()
-                }
+            // Developer Tools & Configs
+            VStack(alignment: .leading, spacing: 8) {
+                Text("DEVELOPER TOOLS & DIRECTORIES")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
 
-                QuickLinkButton(
-                    title: "htdocs Folder",
-                    subtitle: "Web Root Directory",
-                    systemImage: "folder.fill.badge.gearshape",
-                    accentColor: .teal
-                ) {
-                    manager.openHtdocs()
-                }
+                LazyVGrid(columns: columns, spacing: 10) {
+                    QuickLinkTile(
+                        title: "htdocs Folder",
+                        subtitle: "Web Root Directory",
+                        systemImage: "folder.fill.badge.gearshape",
+                        tintColor: .teal
+                    ) {
+                        manager.openHtdocs()
+                    }
 
-                QuickLinkButton(
-                    title: "XAMPP Directory",
-                    subtitle: "/Applications/XAMPP",
-                    systemImage: "folder.fill",
-                    accentColor: .indigo
-                ) {
-                    manager.openXamppFolder()
-                }
+                    QuickLinkTile(
+                        title: "Virtual Hosts",
+                        subtitle: "httpd-vhosts.conf",
+                        systemImage: "network",
+                        tintColor: .pink
+                    ) {
+                        manager.openConfigFile(path: PathConfig.vhostsConfPath, name: "Virtual Hosts")
+                    }
 
-                QuickLinkButton(
-                    title: "Config (etc)",
-                    subtitle: "httpd.conf, php.ini",
-                    systemImage: "gearshape.fill",
-                    accentColor: .gray
-                ) {
-                    manager.openConfigFolder()
-                }
+                    QuickLinkTile(
+                        title: "MySQL Terminal",
+                        subtitle: "mysql -u root",
+                        systemImage: "terminal.fill",
+                        tintColor: .amberColor
+                    ) {
+                        manager.openMysqlTerminal()
+                    }
 
-                QuickLinkButton(
-                    title: "Virtual Hosts",
-                    subtitle: "httpd-vhosts.conf",
-                    systemImage: "network.badge.shield.half.filled",
-                    accentColor: .pink
-                ) {
-                    manager.openConfigFile(path: PathConfig.vhostsConfPath, name: "Virtual Hosts (httpd-vhosts.conf)")
-                }
+                    QuickLinkTile(
+                        title: "Apache Syntax Test",
+                        subtitle: "httpd -t check",
+                        systemImage: "checkmark.seal.fill",
+                        tintColor: .green
+                    ) {
+                        Task { await manager.testApacheConfig() }
+                    }
 
-                QuickLinkButton(
-                    title: "Logs Folder",
-                    subtitle: "error_log, access_log",
-                    systemImage: "doc.text.fill",
-                    accentColor: .purple
-                ) {
-                    manager.openLogsFolder()
+                    QuickLinkTile(
+                        title: "XAMPP Root",
+                        subtitle: "/Applications/XAMPP",
+                        systemImage: "folder.fill",
+                        tintColor: .secondary
+                    ) {
+                        manager.openXamppFolder()
+                    }
+
+                    QuickLinkTile(
+                        title: "Logs Folder",
+                        subtitle: "error_log, access_log",
+                        systemImage: "doc.text.fill",
+                        tintColor: .purple
+                    ) {
+                        manager.openLogsFolder()
+                    }
                 }
             }
         }
     }
 }
 
-private struct QuickLinkButton: View {
+private struct QuickLinkTile: View {
     let title: String
     let subtitle: String
     let systemImage: String
-    let accentColor: Color
+    let tintColor: Color
     let action: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(accentColor.opacity(0.12))
-                        .frame(width: 32, height: 32)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tintColor.opacity(0.14))
+                        .frame(width: 36, height: 36)
 
                     Image(systemName: systemImage)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(accentColor)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(tintColor)
                 }
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundColor(.primary)
 
                     Text(subtitle)
@@ -116,19 +149,25 @@ private struct QuickLinkButton: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isHovered ? Color(nsColor: .controlAccentColor).opacity(0.08) : Color(nsColor: .controlBackgroundColor))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(isHovered ? Color(nsColor: .controlAccentColor).opacity(0.3) : Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(isHovered ? Color(nsColor: .controlAccentColor).opacity(0.35) : Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 1)
             )
+            .shadow(color: Color.black.opacity(isHovered ? 0.06 : 0), radius: 4, y: 2)
+            .scaleEffect(isHovered ? 1.01 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
     }
 }
 
+private extension Color {
+    static let amberColor = Color(red: 0.95, green: 0.60, blue: 0.10)
+}

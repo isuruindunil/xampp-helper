@@ -301,40 +301,48 @@ public struct SettingsView: View {
     // MARK: - About Section
 
     private var aboutSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("About XAMPP Helper")
                 .font(.system(size: 15, weight: .bold))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Developer / Author:")
                         .foregroundColor(.secondary)
+                        .frame(width: 140, alignment: .leading)
                     Text("Isuru Indunil")
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                 }
                 HStack {
                     Text("Contact:")
                         .foregroundColor(.secondary)
-                    Text("hello@isuruindunil.me")
+                        .frame(width: 140, alignment: .leading)
+                    Link("hello@isuruindunil.me", destination: URL(string: "mailto:hello@isuruindunil.me")!)
+                        .foregroundColor(.accentColor)
                 }
                 HStack {
                     Text("Website:")
                         .foregroundColor(.secondary)
-                    Text("https://isuruindunil.me")
+                        .frame(width: 140, alignment: .leading)
+                    Link("https://isuruindunil.me", destination: URL(string: "https://isuruindunil.me")!)
+                        .foregroundColor(.accentColor)
                 }
                 HStack {
                     Text("App Version:")
                         .foregroundColor(.secondary)
+                        .frame(width: 140, alignment: .leading)
                     Text("1.0.0")
                 }
                 HStack {
                     Text("Detected XAMPP:")
                         .foregroundColor(.secondary)
+                        .frame(width: 140, alignment: .leading)
                     Text("v\(manager.xamppVersion)")
                 }
                 HStack {
                     Text("Copyright:")
                         .foregroundColor(.secondary)
+                        .frame(width: 140, alignment: .leading)
                     Text("© 2026 Isuru Indunil. All rights reserved.")
                 }
             }

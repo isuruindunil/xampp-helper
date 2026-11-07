@@ -33,7 +33,8 @@ public struct ContentView: View {
                             } label: {
                                 Image(systemName: "play.fill")
                             }
-                            .help("Start All Services")
+                            .help("Start All Services (⇧⌘S)")
+                            .keyboardShortcut("s", modifiers: [.command, .shift])
                             .disabled(manager.isOperating)
 
                             Button {
@@ -41,17 +42,19 @@ public struct ContentView: View {
                             } label: {
                                 Image(systemName: "stop.fill")
                             }
-                            .help("Stop All Services")
+                            .help("Stop All Services (⌥⌘S)")
+                            .keyboardShortcut("s", modifiers: [.command, .option])
                             .disabled(manager.isOperating)
                         }
                     }
 
                     Button {
-                        Task { await manager.refreshStatus() }
+                        Task { await manager.refreshStatus(force: true) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .help("Refresh Status")
+                    .help("Refresh Status (⌘R)")
+                    .keyboardShortcut("r", modifiers: [.command])
                     .disabled(manager.isOperating)
                 }
             }
