@@ -29,3 +29,4 @@ public enum LaunchAtLoginHelper {
         return false
     }
 }
+

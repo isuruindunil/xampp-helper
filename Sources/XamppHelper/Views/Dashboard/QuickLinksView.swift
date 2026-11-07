@@ -60,6 +60,15 @@ public struct QuickLinksView: View {
                 }
 
                 QuickLinkButton(
+                    title: "Virtual Hosts",
+                    subtitle: "httpd-vhosts.conf",
+                    systemImage: "network.badge.shield.half.filled",
+                    accentColor: .pink
+                ) {
+                    manager.openConfigFile(path: PathConfig.vhostsConfPath, name: "Virtual Hosts (httpd-vhosts.conf)")
+                }
+
+                QuickLinkButton(
                     title: "Logs Folder",
                     subtitle: "error_log, access_log",
                     systemImage: "doc.text.fill",

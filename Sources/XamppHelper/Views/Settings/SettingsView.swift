@@ -4,6 +4,9 @@ public struct SettingsView: View {
     @ObservedObject var manager: XamppManager
     @State private var sudoStatusFeedback: String? = nil
     @State private var isTestingSudo: Bool = false
+    @State private var launchAtLogin: Bool = LaunchAtLoginHelper.isEnabled
+    @State private var portStatuses: [PortStatus] = []
+    @State private var isScanningPorts: Bool = false
 
     public var body: some View {
         ScrollView {
@@ -18,8 +21,13 @@ public struct SettingsView: View {
 
                 Divider()
 
-                // Auto Refresh Section
-                autoRefreshSection
+                // Auto Refresh & Startup Section
+                startupSection
+
+                Divider()
+
+                // Port Diagnostics Section
+                portDiagnosticsSection
 
                 Divider()
 
@@ -27,6 +35,9 @@ public struct SettingsView: View {
                 aboutSection
             }
             .padding(24)
+        }
+        .onAppear {
+            scanPorts()
         }
     }
 
@@ -171,14 +182,23 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - Auto Refresh
+    // MARK: - Startup & Background Monitoring
 
-    private var autoRefreshSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Background Monitoring")
+    private var startupSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Startup & Monitoring")
                 .font(.system(size: 15, weight: .bold))
 
-            Toggle("Automatically monitor service status", isOn: $manager.autoRefreshEnabled)
+            Toggle("Launch XAMPP Helper automatically at macOS login", isOn: Binding(
+                get: { launchAtLogin },
+                set: { newValue in
+                    launchAtLogin = newValue
+                    _ = LaunchAtLoginHelper.setEnabled(newValue)
+                }
+            ))
+            .toggleStyle(.switch)
+
+            Toggle("Automatically monitor service status in background", isOn: $manager.autoRefreshEnabled)
                 .toggleStyle(.switch)
 
             if manager.autoRefreshEnabled {
@@ -196,6 +216,82 @@ public struct SettingsView: View {
                     .frame(width: 180)
                     .onChange(of: manager.refreshIntervalSeconds) { _, _ in
                         manager.startAutoRefresh()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Port Diagnostics
+
+    private var portDiagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Port Diagnostics & Conflict Detection")
+                    .font(.system(size: 15, weight: .bold))
+
+                Spacer()
+
+                Button {
+                    scanPorts()
+                } label: {
+                    if isScanningPorts {
+                        ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                    } else {
+                        Label("Scan Ports", systemImage: "network")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isScanningPorts)
+            }
+
+            Text("Detects if required TCP ports (80, 443, 3306, 21) are open or occupied by conflicting software (e.g. macOS native Apache, Homebrew MySQL).")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+
+            if !portStatuses.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(portStatuses) { status in
+                        HStack(spacing: 12) {
+                            Text("Port \(status.port)")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .frame(width: 75, alignment: .leading)
+
+                            Text(status.serviceName)
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            if status.isConflict {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.red)
+                                    Text("Conflict (Occupied by another app)")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.red)
+                                }
+                            } else if status.isListening {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Active (XAMPP)")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.green)
+                                }
+                            } else {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "circle")
+                                        .foregroundColor(.secondary)
+                                    Text("Available")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
                     }
                 }
             }
@@ -252,5 +348,22 @@ public struct SettingsView: View {
             sudoStatusFeedback = active ? "Verification passed: Sudo works without password!" : "Verification failed: Admin password required."
         }
     }
-}
 
+    private func scanPorts() {
+        isScanningPorts = true
+        Task {
+            let apacheActive = manager.services[.apache]?.state == .running
+            let mysqlActive = manager.services[.mysql]?.state == .running
+            let ftpActive = manager.services[.proftpd]?.state == .running
+            let results = await PortChecker.checkStandardPorts(
+                apacheRunning: apacheActive,
+                mysqlRunning: mysqlActive,
+                ftpRunning: ftpActive
+            )
+            DispatchQueue.main.async {
+                self.portStatuses = results
+                self.isScanningPorts = false
+            }
+        }
+    }
+}
